@@ -1,8 +1,0 @@
-defaults:
-  - dataset: mov_mnist
-#  - dataset: dsprites
-
-#resume: '/home/acomasma/ool-dynamics/koopman-tracker/outputs/test_4/Koopman_Disentanglement/models/checkpoint-epoch1.pth'
-resume:
-device:
-run_id:

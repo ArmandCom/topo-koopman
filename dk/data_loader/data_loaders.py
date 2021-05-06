@@ -3,9 +3,11 @@ import torch
 from base import BaseDataLoader
 from data_loader.ground_truth import named_data
 from data_loader.dlib_dataset import DisentanglementDataset
-from data_loader.moving_mnist_dataset import MovingMNISTDataset
+# from data_loader.moving_mnist_dataset import MovingMNISTDataset, MovingMNISTDataset_centered
+from data_loader.moving_mnist import MovingMNISTDataset, MovingMNISTDataset_centered
 from data_loader.bouncing_balls_dataset import BouncingBallsDataset
 import numpy as np
+from utils import augs
 
 class MnistDataLoader(BaseDataLoader):
     """
@@ -38,20 +40,57 @@ class DlibLoader(BaseDataLoader):
 
         super().__init__(self.dataset, total_batch_size, shuffle, n_objects, validation_split, dataset_reduction, num_workers)
 
+# class MovingMNISTLoader(BaseDataLoader):
+#     """
+#     disentanglement_lib dataset loading using BaseDataLoader
+#     """
+#     def __init__(self, dataset_case, dataset_name, seq_length, seq_stride, n_objects, data_dir, batch_size, shuffle=True, training_split=0.9, validation_split=0.0, dataset_reduction=0, num_workers=1, training=True):
+#         total_batch_size = batch_size * n_objects #This is a patchy way of doing it
+#         self.data_dir = data_dir
+#         self.name = dataset_name
+#         self.case = dataset_case
+#         transform = transforms.Compose([ToTensor()])
+#
+#         if dataset_case == 'spherical_manifold':
+#             self.dataset = MovingMNISTDataset_centered(self.case, data_dir, training, seq_length,
+#                                                        0, 1, training_split, transform)
+#         else:
+#             self.dataset = MovingMNISTDataset(self.case, data_dir, training, seq_length,
+#                                        0, 1, training_split, transform) #TODO: we set num_obj to 1 for all cases, to merge them in the patchy way
+#
+#         super().__init__(self.dataset, total_batch_size, shuffle, n_objects, validation_split, dataset_reduction, num_workers, training=training)
+
 class MovingMNISTLoader(BaseDataLoader):
     """
     disentanglement_lib dataset loading using BaseDataLoader
     """
-    def __init__(self, dataset_name, seq_length, seq_stride, n_objects, data_dir, batch_size, shuffle=True, training_split=0.9, validation_split=0.0, dataset_reduction=0, num_workers=1, training=True):
-
-        total_batch_size = batch_size * n_objects #This is a patchy way of doing it
+    def __init__(self, dataset_case, dataset_name, seq_length, seq_stride, n_objects, data_dir, batch_size, image_size=[128, 128], shuffle=True, training_split=0.9, validation_split=0.0, dataset_reduction=0, num_workers=1, training=True):
+        total_batch_size = batch_size #This is a patchy way of doing it
         self.data_dir = data_dir
         self.name = dataset_name
-        transform = transforms.Compose([ToTensor()])
-        self.dataset = MovingMNISTDataset(data_dir, training, seq_length,
-                                   0, 1, training_split, transform) #TODO: we set num_obj to 1 for all cases, to merge them in the patchy way
+        self.case = dataset_case
+
+        image_size = image_size[0]
+        frame_transforms = [] #'crop'
+        frame_aug = [] #['cj','grid']
+        patch_size = [128, 128, 3]
+
+        # transform_train = augs.get_train_transforms(image_size, frame_transforms,
+        #                                             frame_aug, patch_size)
+        # transform_test = transform_train # TODO: What transform for training?
+        # transform = transform_train if training else transform_test
+
+        transform = transforms.Compose([ToTensor()]) #Scale()
+
+        if dataset_case == 'spherical_manifold' or dataset_case == 'spherical_manifold_accelerate' :
+            self.dataset = MovingMNISTDataset_centered(self.case, data_dir, training, seq_length,
+                                                       0, n_objects, image_size, training_split, transform)
+        else:
+            self.dataset = MovingMNISTDataset(self.case, data_dir, training, seq_length,
+                                              0, n_objects, image_size, training_split, transform)
 
         super().__init__(self.dataset, total_batch_size, shuffle, n_objects, validation_split, dataset_reduction, num_workers, training=training)
+
 
 class BouncingBallsLoader(BaseDataLoader):
     """
@@ -63,6 +102,7 @@ class BouncingBallsLoader(BaseDataLoader):
         total_batch_size = batch_size
         self.data_dir = data_dir
         self.name = dataset_name
+        image_size = image_size[0]
         transform = transforms.Compose([ToTensor()]) #Scale()
         self.dataset = BouncingBallsDataset(data_dir, training, seq_length,
                                           0, n_objects, image_size, training_split, transform)

@@ -45,15 +45,16 @@ class Trainer(BaseTrainer):
         self.train_metrics.reset()
 
         for batch_idx, data in enumerate(self.data_loader):
-            if self.config["data_loader"]["type"] == "MovingMNISTLoader":
-                data = overlap_objects_from_batch(data, self.config['n_objects'])
+            # if self.config["data_loader"]["type"] == "MovingMNISTLoader":
+            #     data = overlap_objects_from_batch(data, self.config['n_objects'])
             target = data # Is data a variable?
             data, target = data.to(self.device), target.to(self.device)
 
             self.optimizer.zero_grad()
             output = self.model(data, epoch_iter=(epoch, (epoch + 1)*batch_idx))
             loss, loss_particles = self.criterion(output, target,
-                                                  epoch_iter=(epoch, (epoch-1)*len(self.data_loader)+batch_idx), lambd=self.config["trainer"]["lambd"])
+                                                  epoch_iter=(epoch, (epoch-1)*len(self.data_loader)+batch_idx),
+                                                  case=self.config["data_loader"]['args']["dataset_case"])
             loss = loss.mean()
 
             # Note: from space implementation
@@ -77,7 +78,6 @@ class Trainer(BaseTrainer):
 
                 self.logger.debug('Train Epoch: {} {} '.format(epoch, self._progress(batch_idx)) + loss_particles_str + 'Loss: {:.6f}'.format(
                     loss.item()))
-
                 self._show(data, output)
 
             if batch_idx == self.len_epoch:
@@ -106,15 +106,15 @@ class Trainer(BaseTrainer):
         self.valid_metrics.reset()
         with torch.no_grad():
             for batch_idx, data in enumerate(self.valid_data_loader):
-                if self.config["data_loader"]["type"] == "MovingMNISTLoader":
-                    data = overlap_objects_from_batch(data, self.config['n_objects'])
+                # if self.config["data_loader"]["type"] == "MovingMNISTLoader":
+                #     data = overlap_objects_from_batch(data, self.config['n_objects'])
                 target = data  # Is data a variable?
                 data, target = data.to(self.device), target.to(self.device)
 
-                output = self.model(data, epoch_iter=(epoch, (epoch + 1)*batch_idx))
+                output = self.model(data, epoch_iter=(epoch, (epoch + 1)*batch_idx), test=True)
                 loss, loss_particles = self.criterion(output, target,
                                                       epoch_iter=(epoch, (epoch + 1)*batch_idx),
-                                                      lambd=self.config["trainer"]["lambd"])
+                                                      case=self.config["data_loader"]['args']["dataset_case"])
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.valid_metrics.update('loss', loss.item())
@@ -139,79 +139,29 @@ class Trainer(BaseTrainer):
         return base.format(current, total, 100.0 * current / total)
 
     def _show(self, data, output, train=True):
+        # print('a', output["rec"].shape, data.shape)
+        rec = output["rec"]
+        pred_1 = output["pred_1"]
 
-        rec = output["rec_ori"]
-        data_plot = data[0, -output["pred_roll"].shape[1]:]
-        rec_plot = output["rec_ori"][0, -output["pred_roll"].shape[1]:]
-        pred_plot = output["pred_roll"][0]
-        vid_plot = torch.cat([data_plot, rec_plot, pred_plot], dim=0)
-        self.writer.add_image('a-Videos--Input-Rec-Pred', make_grid(vid_plot.cpu(), nrow=output["pred_roll"].shape[1], normalize=True))
+        prev_data_plot = data[0, -(pred_1.shape[1]+1):-1].mean(1, keepdims=True)
+        data_plot = data[0, -pred_1.shape[1]:].mean(1, keepdims=True)
+        rec_plot = rec[0, -pred_1.shape[1]:].mean(1, keepdims=True)
+        pred_plot = pred_1[0, -pred_1.shape[1]:].mean(1, keepdims=True)
 
-        # self.writer.add_image('a-input', make_grid(data[0].cpu(), nrow=data.shape[1], normalize=True))
-        # self.writer.add_image('b-output_rec', make_grid(output["rec"][0, -output["pred"].shape[1]:].cpu(), nrow=output["pred"].shape[1], normalize=True))
-        # # self.writer.add_image('b-output_rec_ori', make_grid(output["rec_ori"][0, -output["pred"].shape[1]:].cpu(), nrow=output["pred"].shape[1], normalize=True))
-        # self.writer.add_image('c-output_pred', make_grid(output["pred"][0].cpu(), nrow=output["pred"].shape[1], normalize=True))
+        # data_plot -= data_plot.min()
+        # data_plot /= data_plot.max()
+        # data_plot *= 255.
+        #
+        # rec_plot -= rec_plot.min()
+        # rec_plot /= rec_plot.max()
+        # rec_plot *= 255.
 
-        # if output["selector"] is not None:
-        #     S_plot = plot_matrix(output["selector"])
-        #     self.writer.add_image('ba-S', make_grid(S_plot, nrow=1, normalize=False))
-        if output["obs_rec_pred"] is not None:
-            g_plot = plot_representation        (output["obs_rec_pred"][:,rec.shape[1]-output["pred"].shape[1]:rec.shape[1]].cpu())
-            g_plot_pred = plot_representation   (output["obs_rec_pred"][:,rec.shape[1]:].cpu())
-            self.writer.add_image('d-g_repr_rec', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-            self.writer.add_image('e-g_repr_pred', make_grid(to_tensor(g_plot_pred), nrow=1, normalize=False))
-        if output["obs_rec_pred_rev"] is not None:
-            g_plot = plot_representation        (output["obs_rec_pred_rev"].cpu())
-            self.writer.add_image('ea-g_repr_pred_rev', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-        if output["dyn_features"] is not None:
-            # g_plot = plot_representation        (output["dyn_features"]["rec_ori"].cpu())
-            # self.writer.add_image('states_rec_ori', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-            g_plot = plot_representation        (output["dyn_features"]["rec_ori"][:,-output["pred"].shape[1]:].cpu())
-            self.writer.add_image('states_rec', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-            g_plot = plot_representation        (output["dyn_features"]["pred"].cpu())
-            self.writer.add_image('states_pred', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-            g_plot = plot_representation        (output["dyn_features"]["pred_roll"].cpu())
-            self.writer.add_image('states_pred_roll', make_grid(to_tensor(g_plot), nrow=1, normalize=False))
-        if output["A"] is not None:
-            A_plot = plot_matrix(output["A"])
-            self.writer.add_image('f-A', make_grid(A_plot, nrow=1, normalize=False))
-        # if output["Ainv"] is not None:
-        #     A_plot = plot_matrix(output["Ainv"])
-        #     self.writer.add_image('fa-A-inv', make_grid(A_plot, nrow=1, normalize=False))
-        #     AA_plot = plot_matrix(torch.mm(output["A"],output["Ainv"]))
-        #     self.writer.add_image('fb-AA', make_grid(AA_plot, nrow=1, normalize=False))
-        # else:
-        #     AA_plot = plot_matrix(torch.mm(output["A"],torch.pinverse(output["A"])))
-        #     self.writer.add_image('fb-AA', make_grid(AA_plot, nrow=1, normalize=False))
-        if output["selectors_rec"] is not None:
-            sels_rec = output["selectors_rec"]
-            if output["selectors_pred"] is not None:
-                sels_pred = output["selectors_pred"]
-                sel_rec_plot = plot_representation(sels_rec[:,-sels_pred.shape[1]:].cpu())
-            else:
-                sel_rec_plot = plot_representation(sels_rec.cpu())
-            self.writer.add_image('b-sel_repr_rec', make_grid(to_tensor(sel_rec_plot), nrow=1, normalize=False))
-        if output["selectors_pred"] is not None:
-            sels_pred = output["selectors_pred"]
-            sel_pred_plot = plot_representation(sels_pred.cpu())
-            self.writer.add_image('b-sel_repr_pred', make_grid(to_tensor(sel_pred_plot), nrow=1, normalize=False))
-        if output["B"] is not None:
-            B_plot = plot_matrix(output["B"])
-            self.writer.add_image('g-B', make_grid(B_plot, nrow=1, normalize=False))
-        if output["u"] is not None:
-            u_plot = plot_representation(output["u"][:, :output["u"].shape[1]].cpu())
-            self.writer.add_image('eb-gu', make_grid(to_tensor(u_plot), nrow=1, normalize=False))
+        vid_plot = torch.cat([data_plot, rec_plot, pred_plot, prev_data_plot], dim=0)
+        self.writer.add_image('a-Videos--Input-Rec', make_grid(vid_plot.cpu(), nrow=output["pred_1"].shape[1], normalize=True))
 
-        # if output[10] is not None: # TODO: Ara el torno a posar
-        #     # print(output[10][0].max(), output[-1][0].min())
-        #     shape = output[10][0].shape
-        #     self.writer.add_image('objects', make_grid(output[10][0].permute(1, 2, 0, 3, 4).reshape(*shape[1:-2], -1, shape[-1]).cpu(), nrow=output[0].shape[1], normalize=True))
-
-        # output["rec"] = torch.clamp(torch.sum(out_rec.reshape(bs, self.n_objects, -1, *out_rec.size()[1:]), dim=1), min=0, max=1)
-        # output["pred"] = torch.clamp(torch.sum(out_pred.reshape(bs, self.n_objects, -1, *out_rec.size()[1:]), dim=1), min=0, max=1)
-        # output["obs_rec_pred"] = returned_g.reshape(-1, returned_g.size()[-1:])
-        # output["gauss_post"] = returned_post
-        # output["A"] = A
-        # output["B"] = B
-        # output["u"] = u.reshape(bs * self.n_objects, -1, u.shape[-1])
-        # output["bern_logit"] = u_logit.reshape(bs, self.n_objects, -1, u_logit.shape[-1]) # Input distribution
+        of = output['optical_flow'].abs()
+        of = torch.cat([of[0, 0], of[0, 1]], dim=0)
+        of[-1,-1] = 1
+        of[0,0] = 0
+        self.writer.add_image('OF', make_grid(of.cpu(), nrow=1, normalize=True))
+        self.writer.add_scalar('OF_max', of[0].max().cpu())

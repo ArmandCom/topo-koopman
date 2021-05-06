@@ -5,8 +5,8 @@ import json
 
 # root = os.path.join(os.environ['HOME'], 'slowbro/bouncing_balls/balls_n4_t60_ex50000/')
 roots = []
-roots.append(os.path.join('./balls_n2_t60_ex50000_m/'))
-roots.append(os.path.join('./balls_n2_t60_ex2000_m/'))
+roots.append(os.path.join('./balls_n4_t60_ex50000_m/'))
+roots.append(os.path.join('./balls_n4_t60_ex2000_m/'))
 
 all_trajs = []
 for root in roots:
@@ -16,8 +16,10 @@ for root in roots:
             # [tid, n_frames, n_balls, [x, y, mass, radius]]
             balls = []
             for ball in traj:
+                # [print(f['mass']) for f in ball]
                 info = [[f['position']['x'], f['position']['y'], f['mass'], f['sizemul']] for f in ball]
                 balls += info,
+            # exit()
             balls = np.array(balls).transpose([1,0,2])
             all_trajs += balls,
 

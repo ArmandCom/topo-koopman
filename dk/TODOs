@@ -1,12 +1,15 @@
 Todo List
 
-General TODOs
+Phases:
+- AE: DONE
+- Get git version on
+- Visualize feature maps
+- Linear MNIST
+- AE - Attn. Predict one step
 
-1. Increase complexity of U encoder (Not embedding)
-2. Use modified spectralnorm from Sandesh to impose smoothness in mapping and inv_mapping.
-3. In test mode we should impose always the same annealing mode for collisions.
-4. Spectral Norm in all networks. --> Doesn't work well
-5. Recover full state instead of last coordinate.
-6. Pred-only confidence value.
+Check:
+- TMS: Slack yuexi
 
-7. Check if validation is a different loader!!!
+Visualization:
+- Feature maps: New visualization tool --> https://wandb.ai/wandb/posts/reports/The-W-B-Machine-Learning-Visualization-IDE--VmlldzoyNjk3Nzg
+- Gradients: Use siren's methods --> https://github.com/vsitzmann/siren/blob/4df34baee3f0f9c8f351630992c1fe1f69114b5f/dataio.py

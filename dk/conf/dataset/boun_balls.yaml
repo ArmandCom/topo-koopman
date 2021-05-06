@@ -3,7 +3,7 @@ n_gpu: 1
 
 # Global variables
 n_timesteps: &NTS 3 # Number of timesteps seen in each state. Time length of the state
-image_size: &IS [64, 64] # Input image size
+image_size: &IS [128, 128] # Input image size
 seq_length: &SeqL 17 # Length of the observed sequence.
 n_objects: &Nobj 4
 # Augmentar sampling rate
@@ -29,6 +29,7 @@ data_loader:
     dataset_reduction: 0.0 #0.94
     num_workers: 2
     image_size: *IS
+    training: True
 
 
 # TODO: probar betas=(0.5, 0.999))
